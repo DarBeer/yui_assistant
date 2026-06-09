@@ -1,40 +1,58 @@
+import dns from 'dns';
+dns.setServers([
+  '195.133.25.16', //Comss.one
+  '1.1.1.1', // Cloudflare (Первичный)
+  '8.8.8.8', // Google (Вторичный)
+  '1.0.0.1'  // Cloudflare (Резервный)
+]);
+console.log('[system]: Установлены кастомные DNS-серверы');
+
+// ТЕПЕРЬ ИМПОРТИРУЕМ ВСЕ ОСТАЛЬНЫЕ МОДУЛИ
 import express, { Request, Response } from 'express';
 import { Telegraf } from 'telegraf';
+import { message } from 'telegraf/filters';
 import { GoogleGenAI } from '@google/genai';
 import * as dotenv from 'dotenv';
-import 'dotenv/config';
+
+// Загружаем переменные окружения
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.GEMINI_API_KEY) {
-  console.error('[error]: не заполнены токены в файде .env');
+  console.error('[error]: Не заполнены токены в файле .env!');
   process.exit(1);
 }
 
-const bot: Telegraf = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
-const ai: GoogleGenAI = new GoogleGenAI({apiKey: process.env.GEMINI_API_KEY});
+// Инициализация клиентов
+const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Мидлвар для работы с JSON-телом запросов
 app.use(express.json());
 
-bot.start((ctx) => {
-  ctx.reply(`Привет, ${ctx.from.first_name}! Я умный бот на базе Gemini AI. Спроси меня о чём угодно!`);
-});
+// Функции для форматирования текста в HTML
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
-bot.help((ctx) => {
-  ctx.reply('Спрашивай, что хочешь c:');
-});
+function markdownToHtml(markdown: string): string {
+  let html = escapeHtml(markdown);
+  html = html.replace(/```(?:[a-zA-Z0-9]+)?\n([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  html = html.replace(/\*\*([\s\S]*?)\*\*/g, '<b>$1</b>');
+  html = html.replace(/\*([\s\S]*?)\*/g, '<i>$1</i>');
+  return html;
+}
 
-// Реагируем на любое текстовое сообщение
-bot.on('text', async (ctx) => {
+// Логика обработки сообщений бота
+bot.on(message('text'), async (ctx) => {
   const userMessage = ctx.message.text;
 
   try {
-    // Отправляем уведомление, что бот "печатает" ответ
     await ctx.sendChatAction('typing');
 
-    // Запускаем стриминг от Gemini API
+    // Благодаря модулю dns, этот запрос пойдет через резолверы 1.1.1.1
     const responseStream = await ai.models.generateContentStream({
       model: 'gemini-2.5-flash',
       contents: userMessage,
@@ -42,71 +60,72 @@ bot.on('text', async (ctx) => {
 
     let fullResponse = '';
     let messageId: number | null = null;
-    let lastUpdateTime = Date.now();
+    let lastUpdateTime = 0;
+    const UPDATE_INTERVAL = 1200; 
 
-    // Читаем поток данных от ИИ по кусочкам
     for await (const chunk of responseStream) {
       const chunkText = chunk.text;
       if (!chunkText) continue;
 
       fullResponse += chunkText;
+      const now = Date.now();
 
-      // Если это самый первый кусочек, отправляем новое сообщение
       if (messageId === null) {
-        const sentMessage = await ctx.reply(fullResponse);
+        const formattedText = markdownToHtml(fullResponse) + ' ▌';
+        const sentMessage = await ctx.reply(formattedText, { parse_mode: 'HTML' });
         messageId = sentMessage.message_id;
-        lastUpdateTime = Date.now();
-      } else {
-        // Ограничиваем частоту обновлений в Telegram (не чаще чем раз в 1 секунду),
-        // чтобы не поймать ошибку "Too Many Requests" (429)
-        if (Date.now() - lastUpdateTime > 1000) {
-          try {
-            await ctx.telegram.editMessageText(
-              ctx.chat.id,
-              messageId,
-              undefined,
-              fullResponse + ' ▌' // Добавляем красивый курсор в конец
-            );
-            lastUpdateTime = Date.now();
-          } catch (editError) {
-            // Игнорируем ошибки, если текст не изменился
-            console.log('[Bot Wait]: Пропуск анимации кадра');
+        lastUpdateTime = now;
+        continue;
+      }
+
+      if (now - lastUpdateTime > UPDATE_INTERVAL) {
+        try {
+          let currentHtml = markdownToHtml(fullResponse);
+          if (currentHtml.endsWith('</code></pre>')) {
+            currentHtml = currentHtml.slice(0, -13) + ' ▌</code></pre>';
+          } else {
+            currentHtml += ' ▌';
+          }
+
+          await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            messageId,
+            undefined,
+            currentHtml,
+            { parse_mode: 'HTML' }
+          );
+          lastUpdateTime = now;
+        } catch (editError: any) {
+          if (!editError.description?.includes('message is not modified')) {
+            console.error('[Edit Error]:', editError.description);
           }
         }
       }
     }
 
-    //Финальное обновление: убираем курсор «▌», когда текст полностью готов
     if (messageId !== null) {
-      await ctx.telegram.editMessageText(
-        ctx.chat.id,
-        messageId,
-        undefined,
-        fullResponse
-      );
+      const finalHtml = markdownToHtml(fullResponse);
+      await ctx.telegram.editMessageText(ctx.chat.id, messageId, undefined, finalHtml, { parse_mode: 'HTML' }).catch(() => {});
     }
 
   } catch (error) {
-    console.error('[Gemini Stream Error]:', error);
-    await ctx.reply('Произошла ошибка при генерации ответа. Попробуйте ещё раз.');
+    console.error('[Gemini Network/Stream Error]:', error);
+    await ctx.reply('Не удалось получить ответ от ИИ. Проверьте сетевое подключение сервера.');
   }
 });
 
-// Базовый эндпоинт сервера для проверки
+// Базовый роут сервера
 app.get('/', (req: Request, res: Response) => {
-  res.json({ message: 'Сервер, Бот и Gemini API успешно работают вместе!' });
+  res.json({ message: 'Сервер работает с кастомными настройками DNS!' });
 });
 
-// Запуск Express сервера
 app.listen(PORT, () => {
   console.log(`[server]: Сервер запущен на http://localhost:${PORT}`);
 });
 
-// Запуск Телеграм-бота (Long Polling)
 bot.launch()
   .then(() => console.log('[bot]: Телеграм-бот успешно запущен!'))
   .catch((err) => console.error('[bot]: Ошибка запуска бота:', err));
 
-// Вежливая остановка бота при выключении сервера
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
