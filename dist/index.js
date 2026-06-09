@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const telegraf_1 = require("telegraf");
 const genai_1 = require("@google/genai");
+require("dotenv/config");
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3000;
 if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.GEMINI_API_KEY) {

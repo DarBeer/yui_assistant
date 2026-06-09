@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { Telegraf } from 'telegraf';
 import { GoogleGenAI } from '@google/genai';
 import * as dotenv from 'dotenv';
+import 'dotenv/config';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
