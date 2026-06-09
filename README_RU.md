@@ -1,6 +1,6 @@
 # Yui Assistant 🤖
 
-🌐 **Языки:** [English](README.md) | [Русский](README_ru.md)
+🌐 **Языки:** [English](README.md) | [Русский](README_RU.md)
 
 ---
 
