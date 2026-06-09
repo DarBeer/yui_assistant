@@ -1,0 +1,26 @@
+{
+  "name": "yui_assistant",
+  "version": "0.0.1",
+  "main": "index.js",
+  "author": "Kiryl Yushkevich",
+  "license": "MIT",
+  "private": true,
+  "outDir": "./dist",
+  "dependencies": {
+    "@google/genai": "^2.8.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^6.0.3"
+  },
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  }
+}
