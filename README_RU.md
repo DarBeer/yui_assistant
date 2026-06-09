@@ -1,5 +1,9 @@
 # Yui Assistant 🤖
 
+🌐 **Языки:** [English](README.md) | [Русский](README_ru.md)
+
+---
+
 **Yui Assistant** — это умный Telegram-бот на базе искусственного интеллекта Google Gemini. Проект разработан на платформе Node.js с использованием TypeScript, обладает модульной архитектурой и готов к развертыванию как локально, так и на сервере.
 
 ## ✨ Особенности
@@ -55,7 +59,7 @@ yarn start
 ### Шаг 2: Клонирование репозитория
 Склонируйте репозиторий и перейдите в созданную директорию:
 ```bash
-git clone https://github.com/DarBeer/yui_assistant
+git clone https://github.com
 cd yui_assistant
 ```
 
