@@ -55,7 +55,7 @@ yarn start
 ### Шаг 2: Клонирование репозитория
 Склонируйте репозиторий и перейдите в созданную директорию:
 ```bash
-git clone https://github.com
+git clone https://github.com/DarBeer/yui_assistant
 cd yui_assistant
 ```
 
