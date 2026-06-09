@@ -1,8 +1,8 @@
 import dns from 'dns';
 dns.setServers([
-  '195.133.25.16', //Comss.one
   '1.1.1.1', // Cloudflare (Первичный)
   '8.8.8.8', // Google (Вторичный)
+  '8.8.4.4', // Geegle (Второчиный резерв)
   '1.0.0.1'  // Cloudflare (Резервный)
 ]);
 console.log('[system]: Установлены кастомные DNS-серверы');
