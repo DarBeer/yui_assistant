@@ -1,13 +1,3 @@
-import dns from 'dns';
-dns.setServers([
-  '1.1.1.1', // Cloudflare (Первичный)
-  '8.8.8.8', // Google (Вторичный)
-  '8.8.4.4', // Geegle (Второчиный резерв)
-  '1.0.0.1'  // Cloudflare (Резервный)
-]);
-console.log('[system]: Установлены кастомные DNS-серверы');
-
-// ТЕПЕРЬ ИМПОРТИРУЕМ ВСЕ ОСТАЛЬНЫЕ МОДУЛИ
 import express, { Request, Response } from 'express';
 import { Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
@@ -20,14 +10,15 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.GEMINI_API_KEY) {
+if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.GEMINI_API_KEY || !process.env.YUI_GEMINI_PROXY) {
   console.error('[error]: Не заполнены токены в файле .env!');
   process.exit(1);
 }
 
 // Инициализация клиентов
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY,
+                             httpOptions: { baseUrl: process.env.YUI_GEMINI_PROXY } });
 
 app.use(express.json());
 
